@@ -9,12 +9,12 @@ button{cursor:pointer;min-height:40px}button:hover{border-color:var(--ac)}
 nav button.on,button.pri{background:var(--ac);color:#1b1714;border-color:var(--ac);font-weight:600}
 button.bad{border-color:var(--bad);color:#f1b0a5}
 button.sm{min-height:32px;padding:3px 9px;font-size:14px}
-input,select,textarea{width:100%}textarea{min-height:80px;resize:vertical}
+input,select,textarea{width:100%;max-width:100%}select{text-overflow:ellipsis}textarea{min-height:80px;resize:vertical}
 label{display:block;font-size:13px;color:var(--mu);margin:8px 0 3px}
-.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.row>*{flex:0 0 auto;width:auto}.row>.grow{flex:1 1 160px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.row>*{flex:0 0 auto;width:auto;max-width:100%;min-width:0}.row>.grow{flex:1 1 160px}
 main{padding:12px}
 .split{display:grid;grid-template-columns:minmax(280px,2fr) 3fr;gap:12px;align-items:start}
-@media(max-width:800px){.split{grid-template-columns:1fr}}
+@media(max-width:800px){.split{grid-template-columns:minmax(0,1fr)}.split>*{min-width:0}}
 .list{max-height:calc(100vh - 170px);overflow:auto;border:1px solid var(--bd);border-radius:10px;margin-top:8px}
 .li{padding:8px 12px;border-bottom:1px solid var(--bd);cursor:pointer;display:flex;justify-content:space-between;gap:8px}
 .li:hover,.li.sel{background:var(--p2)}.li small{color:var(--mu)}
@@ -23,7 +23,7 @@ main{padding:12px}
 .mu{color:var(--mu)}.tag{display:inline-block;font-size:12px;border:1px solid var(--bd);border-radius:20px;padding:1px 9px;margin-right:4px;color:var(--mu)}
 .pre{white-space:pre-wrap}
 .verdict{border-left:3px solid var(--ac);padding-left:12px}.verdict p{margin:6px 0}
-.cols{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.cols{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));gap:12px}
 .copy{background:var(--p2);border-radius:8px;padding:8px 10px;margin:8px 0}
 .pip{display:inline-block;width:12px;height:12px;border-radius:50%;border:1px solid var(--bad);margin-right:3px}.pip.f{background:var(--bad)}
 .locked{color:var(--bad);font-weight:600}.att{color:var(--ok);font-weight:600}
