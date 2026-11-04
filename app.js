@@ -130,12 +130,15 @@ function itemsView(){
   <div class="list">${lh||'<div class="li mu">Nothing found</div>'}</div></div>
   <div id="detail">${sel?detail(sel):'<p class="mu">Select an item.</p>'}</div></div>`;
 }
+// Several lines of typed text, with indents and bullet lists (the suite's /core/text.js; kept as typed if it can't load)
+function txt(t){return window.DMPText?window.DMPText.textHTML(t):`<p class="pre">${esc(t)}</p>`}
+import('/core/text.js').then(()=>{try{if($('#modal').hidden)render()}catch{}}).catch(()=>{});
 function detail(i){
   const copies=S.inv.filter(c=>c.itemId===i.id);
   return `<div class="card"><h2>${esc(i.name)}</h2><div class="mu">${esc(rarLine(i))}${i.tier?' · Tier '+i.tier:''}</div>
   <div style="margin:6px 0"><span class="tag">${esc(i.source)}</span>${attLine(i)?`<span class="tag">${esc(attLine(i))}</span>`:'<span class="tag">No attunement</span>'}${i.value?`<span class="tag">${esc(i.value)}</span>`:''}${i.weight?`<span class="tag">${esc(i.weight)}</span>`:''}</div>
   ${visLine(i)}
-  <p class="pre">${esc(i.desc)||'<span class="mu">(no description)</span>'}</p>
+  ${i.desc?txt(i.desc):'<p class="mu">(no description)</p>'}
   ${needsAtt(i)||i.verdict?`<h3>The Item's Verdict</h3>${verdictHTML(i)}`:''}
   ${fxSection(i)}
   <h3>Inventory</h3>${copies.length?copies.map(c=>`<div class="copy">${esc(holderName(c.holder))}${c.choice?` · ${esc(copyName(c))}`:''}${c.attuned?' · <span class="att">attuned</span>':''}</div>`).join(''):'<p class="mu">Not in the inventory.</p>'}
