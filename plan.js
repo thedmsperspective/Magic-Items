@@ -25,6 +25,8 @@ function planFind(id){
   }
   return null;
 }
+// Items that leave something to choose (which weapon, which damage type)
+function planNeedsChoice(i){const ch=VIEWS?VIEWS.itemChoices(i):null;return!!(ch&&(ch.options.length>1||ch.dmg))}
 const PLAN_WORD={mod:'module',ch:'chapter',area:'area',card:'card'};
 // Every area as "Module › Chapter › Area", for moving cards and for adding from the Items tab
 function planAreas(){const out=[];for(const m of planData().mods)for(const c of m.ch)for(const a of c.areas)out.push({id:a.id,label:`${m.name} › ${c.name} › ${a.name}`});return out}
@@ -38,14 +40,15 @@ function planView(){
     <span class="pl-btns">${extra||''}<button class="sm" data-pmv="${node.id}:-1" aria-label="Move ${esc(node.name)} up">↑</button><button class="sm" data-pmv="${node.id}:1" aria-label="Move ${esc(node.name)} down">↓</button><button class="sm" data-pren="${node.id}">Rename</button><button class="sm bad" data-pdel="${node.id}" aria-label="Delete ${esc(node.name)}">✕</button></span></summary>`;
   const tally=(f,n)=>n?`<span class="tag">${f} of ${n} found</span>`:'';
   const card=k=>{
-    const i=byId[k.item];const nm=i?i.name:'(not in your library)';
+    const i=byId[k.item];const nm=i?(VIEWS&&k.choice?VIEWS.choiceName(i.name,k.choice):i.name):'(not in your library)';
+    const asks=i&&!k.given&&planNeedsChoice(i);
     return `<div class="copy pl-card ${k.given?'pl-given':''}">
       <div class="row"><b class="grow"><a href="#" data-open="${esc(k.item)}" style="color:inherit">${esc(nm)}</a></b>${i?`<span class="mu" style="font-size:13px">${esc(i.rarity||'')}${needsAtt(i)?' · attunement':''}</span>`:''}</div>
       ${k.note?`<div class="mu pl-note">${esc(k.note)}</div>`:''}
       <div class="row" style="margin-top:6px">${k.given
         ?`<span class="att">✓ Found${k.to?` · given to ${esc(holderName(k.to))}`:''}</span><span class="grow"></span><button class="sm" data-pundo="${k.id}">Not found yet</button>`
         :`${i?`<select class="sm" data-pto="${k.id}" style="padding:3px">${holderOpts('stash')}</select><button class="sm pri" data-pgive="${k.id}">Hand out</button><button class="sm" data-pfound="${k.id}" title="Mark it found without giving a copy">Found</button>`:''}<span class="grow"></span>`}
-        <button class="sm" data-pmv="${k.id}:-1" aria-label="Move up">↑</button><button class="sm" data-pmv="${k.id}:1" aria-label="Move down">↓</button><button class="sm" data-pnote="${k.id}">Note</button><button class="sm" data-pmove="${k.id}">Move…</button><button class="sm bad" data-pdel="${k.id}" aria-label="Remove ${esc(nm)}">✕</button></div></div>`;
+        <button class="sm" data-pmv="${k.id}:-1" aria-label="Move up">↑</button><button class="sm" data-pmv="${k.id}:1" aria-label="Move down">↓</button>${asks?`<button class="sm" data-pch="${k.id}">${k.choice?'Change details':'Choose details'}</button>`:''}<button class="sm" data-pnote="${k.id}">Note</button><button class="sm" data-pmove="${k.id}">Move…</button><button class="sm bad" data-pdel="${k.id}" aria-label="Remove ${esc(nm)}">✕</button></div></div>`;
   };
   const area=a=>`<details class="pl-area" data-pid="${a.id}" ${planOpen(a.id)?'open':''}>${head(a,'area',tally(foundCount(a.cards),a.cards.length),a.cards.length?`<button class="sm" data-pprint="${a.id}">+ Print</button>`:'')}
     <div class="pl-body">${a.cards.map(card).join('')||'<p class="mu">No cards here yet.</p>'}<button class="sm" data-padd="${a.id}">+ Add a card</button></div></details>`;
@@ -88,8 +91,10 @@ function bindPlan(){
   on('[data-pgive]',e=>{
     const f=planFind(e.dataset.pgive);if(!f)return;const i=byId[f.node.item];if(!i)return;
     const to=A.querySelector(`[data-pto="${e.dataset.pgive}"]`).value;
-    chooseFor(i,null,ch=>{addCopy(i.id,to,ch);f.node.given=Date.now();f.node.to=to;save();render()});
+    const give=ch=>{addCopy(i.id,to,ch);f.node.given=Date.now();f.node.to=to;save();render()};
+    if(f.node.choice)give(f.node.choice);else chooseFor(i,null,give);
   });
+  on('[data-pch]',e=>{const f=planFind(e.dataset.pch);if(!f)return;const i=byId[f.node.item];if(!i)return;chooseFor(i,f.node.choice,ch=>{if(ch)f.node.choice=ch;else delete f.node.choice;save();render()})});
   on('[data-pfound]',e=>{const f=planFind(e.dataset.pfound);if(!f)return;f.node.given=Date.now();delete f.node.to;save();render()});
   on('[data-pundo]',e=>{const f=planFind(e.dataset.pundo);if(!f)return;if(f.node.to&&!confirm(`Mark it not found yet? The copy you gave to ${holderName(f.node.to)} stays with them; remove it on the Party tab if you need to.`))return;delete f.node.given;delete f.node.to;save();render()});
   on('[data-open]',e=>{S.ui.sel=e.dataset.open;S.ui.tab='items';save();render()});
