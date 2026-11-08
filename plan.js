@@ -110,8 +110,13 @@ function planPickArea(title,cur,done,withNote){
 function planAddCards(areaId){
   const f=planFind(areaId);if(!f)return;
   let q='';const added=[];
-  const list=m=>{const t=q.toLowerCase();const L=ITEMS.filter(i=>!t||i.name.toLowerCase().includes(t)).slice(0,60);
-    $('#plist',m).innerHTML=L.map(i=>`<div class="li" data-pick="${esc(i.id)}"><span>${esc(i.name)}<br><small>${esc(i.rarity||'')}${needsAtt(i)?' · attunement':''}</small></span>${f.node.cards.some(k=>k.item===i.id)?'<span class="att">✓</span>':''}</div>`).join('')||'<div class="li mu">Nothing found</div>'};
+  // the same items the Items tab lists: your table's edition only (no doubles from the other rules), GM-only ones included;
+  // every word you type has to match ("potion resistance" finds Potion of Fire Resistance); names starting with it come first
+  const list=m=>{const t=q.trim().toLowerCase();
+    const rank=i=>{const n=i.name.toLowerCase();return n===t?0:n.startsWith(t)?1:n.split(/[\s(,-]+/).some(w=>w.startsWith(t))?2:3};
+    const ws=t.split(/\s+/).filter(w=>w&&!['of','the','a'].includes(w));
+    const L=ITEMS.filter(i=>{if(otherEd(i))return false;const h=[i.name,i.type,i.source].join(' ').toLowerCase();return ws.every(w=>h.includes(w))}).sort((a,b)=>rank(a)-rank(b)||a.name.localeCompare(b.name)).slice(0,200);
+    $('#plist',m).innerHTML=L.map(i=>`<div class="li" data-pick="${esc(i.id)}"><span>${esc(i.name)}<br><small>${esc(i.rarity||'')}${needsAtt(i)?' · attunement':''}${i.source?` · ${esc(i.source)}`:''}</small></span>${f.node.cards.some(k=>k.item===i.id)?'<span class="att">✓</span>':''}</div>`).join('')||'<div class="li mu">Nothing found</div>'};
   modal(`<h2>Add cards to ${esc(f.node.name)}</h2><input id="pq" placeholder="Search your items…" autocomplete="off"><label style="margin-top:8px">Note for the next card (optional)</label><input id="pnote" placeholder="e.g. in the chest under the altar">
     <div class="list" id="plist" style="max-height:45vh;margin-top:8px"></div><p class="mu" id="padded" style="margin:8px 0 0"></p>
     <div class="row" style="margin-top:10px"><span class="grow"></span><button class="pri" id="pdone">Done</button></div>`,m=>{
