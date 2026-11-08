@@ -142,7 +142,7 @@ function detail(i){
   ${needsAtt(i)||i.verdict?`<h3>The Item's Verdict</h3>${verdictHTML(i)}`:''}
   ${fxSection(i)}
   <h3>Inventory</h3>${copies.length?copies.map(c=>`<div class="copy">${esc(holderName(c.holder))}${c.choice?` · ${esc(copyName(c))}`:''}${c.attuned?' · <span class="att">attuned</span>':''}</div>`).join(''):'<p class="mu">Not in the inventory.</p>'}
-  <div class="row"><select id="addto">${holderOpts('stash')}</select><button class="pri" id="addc">Add a copy</button><button id="edit">Edit</button><button id="toq">${S.printQ.includes(i.id)?'✓ In print queue':'+ Print queue'}</button>${i.id.startsWith('custom:')?'<button class="bad" id="del">Delete</button>':S.edits[i.id]?'<button id="revert">Revert to sheet</button>':''}</div></div>`;
+  <div class="row"><select id="addto">${holderOpts('stash')}</select><button class="pri" id="addc">Add a copy</button><button id="edit">Edit</button><button id="toplan">+ Planned</button><button id="toq">${S.printQ.includes(i.id)?'✓ In print queue':'+ Print queue'}</button>${i.id.startsWith('custom:')?'<button class="bad" id="del">Delete</button>':S.edits[i.id]?'<button id="revert">Revert to sheet</button>':''}</div></div>`;
 }
 // ---------- effects: what an item does to its holder's numbers on their character sheet ----------
 // Read from the description by the suite core (core/effects.js); the DM's own list replaces that where they made one.
@@ -335,7 +335,7 @@ function render(){
   if(PLAYER)return playerRender();
   const t=S.ui.tab;document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
   const app=$('#app');
-  app.innerHTML=shopCard()+(t==='items'?itemsView():t==='party'?partyView():t==='print'?printView():dataView());
+  app.innerHTML=shopCard()+(t==='items'?itemsView():t==='plan'?planView():t==='party'?partyView():t==='print'?printView():dataView());
   bindShopCard();
   if(t==='print')requestAnimationFrame(buildPages);
   bind();
@@ -584,6 +584,7 @@ function bind(){
   const A=$('#app');
   const on=(sel,ev,fn)=>A.querySelectorAll(sel).forEach(e=>e['on'+ev]=fn);
   const t=S.ui.tab;
+  if(t==='plan')bindPlan();
   if(t==='items'){
     let tm;$('#q').oninput=e=>{S.ui.q=e.target.value;clearTimeout(tm);tm=setTimeout(()=>{const p=e.target.selectionStart;render();const q=$('#q');q.focus();q.setSelectionRange(p,p)},200)};
     $('#fsrc').onchange=e=>{S.ui.src=e.target.value;render()};$('#frar').onchange=e=>{S.ui.rar=e.target.value;render()};$('#fatt').onchange=e=>{S.ui.att=e.target.value;render()};$('#fvis').onchange=e=>{S.ui.vis=e.target.value;render()};
@@ -592,6 +593,7 @@ function bind(){
     on('.li[data-id]','click',e=>{S.ui.sel=e.currentTarget.dataset.id;save();render()});
     const sel=S.ui.sel&&byId[S.ui.sel];
     if(sel){
+      $('#toplan').onclick=()=>planAddItem(sel.id);
       $('#addc').onclick=()=>{const h=$('#addto').value;chooseFor(sel,null,ch=>{addCopy(sel.id,h,ch);render()})};
       $('#edit').onclick=()=>editForm(sel);
       const fe=$('#fxedit');if(fe)fe.onclick=()=>fxEditor(sel);

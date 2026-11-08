@@ -60,3 +60,15 @@ main{padding:12px}
 /* effects on the character sheet */
 ul.fx{margin:4px 0 2px;padding-left:20px}
 ul.fx li{margin:2px 0}
+
+/* Planned */
+.pl-mod{padding:0}.pl-mod>.pl-sum{padding:12px 14px}.pl-mod>.pl-body{padding:0 14px 12px}
+.pl-sum{display:flex;align-items:center;gap:8px;flex-wrap:wrap;cursor:pointer;list-style:none}.pl-sum::-webkit-details-marker{display:none}
+.pl-sum::before{content:'▸';color:var(--ac);width:1em}details[open]>.pl-sum::before{content:'▾'}
+.pl-mod>.pl-sum .pl-name{font-size:19px;font-weight:700}.pl-ch>.pl-sum .pl-name{font-size:17px;font-weight:600}.pl-area>.pl-sum .pl-name{font-weight:600}
+.pl-btns{display:flex;gap:4px;flex-wrap:wrap}
+.pl-ch{border-left:3px solid var(--bd);margin:10px 0 10px 4px;padding-left:10px}
+.pl-area{background:var(--p2);border-radius:10px;padding:8px 10px;margin:8px 0}
+.pl-area .pl-card{background:var(--p)}
+.pl-given{opacity:.7}.pl-note{font-size:14px;margin-top:2px;white-space:pre-wrap}
+@media(max-width:600px){.pl-btns{width:100%}}
