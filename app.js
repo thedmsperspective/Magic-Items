@@ -39,7 +39,7 @@ function buildItems(){
   ITEMS.forEach(i=>byId[i.id]=i);
 }
 buildItems();
-const SRC=()=>{const m=new Map();SEED.sources.concat(SRD24.sources||[]).forEach(s=>m.set(s.key,s.name||s.key));ITEMS.forEach(i=>{if(!m.has(i.source))m.set(i.source,i.source)});return m};
+const SRC=()=>{const m=new Map();SEED.sources.concat(edition()==='2024'?SRD24.sources||[]:[]).forEach(s=>m.set(s.key,s.name||s.key));ITEMS.forEach(i=>{if(!otherEd(i)&&!m.has(i.source))m.set(i.source,i.source)});return m};
 const needsAtt=i=>i.attune&&(i.attune.mode==='required'||i.attune.mode==='optional'||i.attune.mode==='unknown'&&i.verdict);
 function attLine(i){const a=i.attune||{};if(a.mode==='required')return 'Requires attunement'+(a.by?' by '+a.by.replace(/^(a|an)\s+/i,m=>m):'');if(a.mode==='optional')return 'Attunement optional';return ''}
 function rarLine(i){return [i.type,i.rarity].filter(Boolean).join(', ')}
@@ -309,7 +309,7 @@ async function takeShopNotes(){
   S.fromShops=S.fromShops||[];S.shopDone=S.shopDone||[];let n=0;
   for(const x of notes){
     if(S.shopDone.includes(x.id)||S.fromShops.some(y=>y.id===x.id))continue;
-    const it=ITEMS.find(i=>normNm(i.name)===normNm(x.item));
+    const it=ITEMS.find(i=>!otherEd(i)&&normNm(i.name)===normNm(x.item))||ITEMS.find(i=>normNm(i.name)===normNm(x.item));
     const p=S.pcs.find(q=>x.charId&&q.charId===x.charId)||S.pcs.find(q=>x.who&&normNm(q.name)===normNm(x.who));
     if(it&&p){addCopy(it.id,p.id);n++;S.shopDone=[...S.shopDone,x.id].slice(-300)}
     else S.fromShops.push({...x,itemId:it?it.id:'',holder:p?p.id:''});
@@ -320,14 +320,14 @@ async function takeShopNotes(){
 function shopCard(){
   const list=S.fromShops||[];if(!list.length)return'';
   return `<div class="card" style="border-color:var(--ac)"><h2 style="font-size:18px">From the shops</h2><p class="mu">Bought in the Shops app, but the item's name or the buyer didn't match. Pick the right ones and give them out.</p>
-  <datalist id="dlallitems">${ITEMS.map(i=>`<option value="${esc(i.name)}">`).join('')}</datalist>
+  <datalist id="dlallitems">${ITEMS.filter(i=>!otherEd(i)).map(i=>`<option value="${esc(i.name)}">`).join('')}</datalist>
   ${list.map(x=>`<div class="row" style="margin:6px 0"><span class="grow"><b>${esc(x.item)}</b> <span class="mu">· ${esc(x.who||'someone')} at ${esc(x.shop||'a shop')}${x.town?`, ${esc(x.town)}`:''}</span></span>
     <input list="dlallitems" data-fsi="${x.id}" value="${esc(x.itemId?(byId[x.itemId]||{}).name||'':x.item)}" style="width:220px" aria-label="Which item"><select data-fsh="${x.id}" style="width:auto">${holderOpts(x.holder||'stash')}</select>
     <button class="sm pri" data-fsgo="${x.id}">Give</button><button class="sm" data-fsno="${x.id}">Dismiss</button></div>`).join('')}</div>`;
 }
 function bindShopCard(){
   document.querySelectorAll('[data-fsgo]').forEach(b=>b.onclick=()=>{const id=b.dataset.fsgo,nm=document.querySelector(`[data-fsi="${id}"]`).value,h=document.querySelector(`[data-fsh="${id}"]`).value;
-    const it=ITEMS.find(i=>normNm(i.name)===normNm(nm));if(!it)return alert("That item isn't in your library. Add it on the Items tab first, or pick one from the list.");
+    const it=ITEMS.find(i=>!otherEd(i)&&normNm(i.name)===normNm(nm))||ITEMS.find(i=>normNm(i.name)===normNm(nm));if(!it)return alert("That item isn't in your library. Add it on the Items tab first, or pick one from the list.");
     addCopy(it.id,h);S.fromShops=S.fromShops.filter(x=>x.id!==id);S.shopDone=[...(S.shopDone||[]),id].slice(-300);save();render()});
   document.querySelectorAll('[data-fsno]').forEach(b=>b.onclick=()=>{if(!confirm('Dismiss this without giving it out?'))return;const id=b.dataset.fsno;S.fromShops=S.fromShops.filter(x=>x.id!==id);S.shopDone=[...(S.shopDone||[]),id].slice(-300);save();render()});
 }
