@@ -311,7 +311,7 @@ async function takeShopNotes(){
     if(S.shopDone.includes(x.id)||S.fromShops.some(y=>y.id===x.id))continue;
     const it=ITEMS.find(i=>!otherEd(i)&&normNm(i.name)===normNm(x.item))||ITEMS.find(i=>normNm(i.name)===normNm(x.item));
     const p=S.pcs.find(q=>x.charId&&q.charId===x.charId)||S.pcs.find(q=>x.who&&normNm(q.name)===normNm(x.who));
-    if(it&&p){addCopy(it.id,p.id);n++;S.shopDone=[...S.shopDone,x.id].slice(-300)}
+    if(it&&p){addCopy(it.id,p.id,x.base?{base:x.base}:undefined);n++;S.shopDone=[...S.shopDone,x.id].slice(-300)}
     else S.fromShops.push({...x,itemId:it?it.id:'',holder:p?p.id:''});
   }
   await core.writeAppdata(tok,'dmp-mi-inbox.json',{app:'dmp-mi-inbox',items:[]});
@@ -328,7 +328,7 @@ function shopCard(){
 function bindShopCard(){
   document.querySelectorAll('[data-fsgo]').forEach(b=>b.onclick=()=>{const id=b.dataset.fsgo,nm=document.querySelector(`[data-fsi="${id}"]`).value,h=document.querySelector(`[data-fsh="${id}"]`).value;
     const it=ITEMS.find(i=>!otherEd(i)&&normNm(i.name)===normNm(nm))||ITEMS.find(i=>normNm(i.name)===normNm(nm));if(!it)return alert("That item isn't in your library. Add it on the Items tab first, or pick one from the list.");
-    addCopy(it.id,h);S.fromShops=S.fromShops.filter(x=>x.id!==id);S.shopDone=[...(S.shopDone||[]),id].slice(-300);save();render()});
+    const fx=(S.fromShops||[]).find(x=>x.id===id);addCopy(it.id,h,fx&&fx.base?{base:fx.base}:undefined);S.fromShops=S.fromShops.filter(x=>x.id!==id);S.shopDone=[...(S.shopDone||[]),id].slice(-300);save();render()});
   document.querySelectorAll('[data-fsno]').forEach(b=>b.onclick=()=>{if(!confirm('Dismiss this without giving it out?'))return;const id=b.dataset.fsno;S.fromShops=S.fromShops.filter(x=>x.id!==id);S.shopDone=[...(S.shopDone||[]),id].slice(-300);save();render()});
 }
 function render(){

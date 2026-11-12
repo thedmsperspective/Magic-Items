@@ -1,4 +1,4 @@
-const C="verdict-v28";
+const C="verdict-v29";
 const F=['./','index.html','app.js','style.css','data.js','data2024.js','manifest.json','icon.svg','plan.js'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(F).then(()=>Promise.all(['/core/suite.js','/core/text.js','/core/columns.js'].map(u=>c.add(u).catch(()=>{}))))));self.skipWaiting()});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x.startsWith("verdict-")&&x!==C).map(x=>caches.delete(x)))));self.clients.claim()});
