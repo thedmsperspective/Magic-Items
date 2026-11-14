@@ -361,7 +361,9 @@ function linkParty(){
     if(c.name&&p.name!==c.name){p.name=c.name;ch=true}
   }
   // untouched placeholders (Player 1–6 holding nothing) aren't needed once the real characters are here
-  const before=S.pcs.length;S.pcs=S.pcs.filter(p=>p.charId||holds(p.id)||!/^Player \d$/.test(p.name));
+  // and an "Unnamed" player added for a sheet that had no name and is no longer in the party, holding nothing
+  const all=new Set((core.cachedParty?core.cachedParty():chars).map(c=>c.id));
+  const before=S.pcs.length;S.pcs=S.pcs.filter(p=>(p.charId?!(p.name==='Unnamed'&&!all.has(p.charId)&&!holds(p.id)):(holds(p.id)||!/^Player \d$/.test(p.name))));
   return ch||S.pcs.length!==before;
 }
 // Move an unlinked player's items and attunement onto a character's player, then drop the old one
