@@ -50,9 +50,18 @@ const attunedCount=h=>S.inv.filter(c=>c.holder===h&&c.attuned).length;
 const uid=()=>Math.random().toString(36).slice(2,9);
 function modal(html,onmount){const m=$('#modal');m.innerHTML='<div class="box">'+html+'</div>';m.hidden=false;m.onclick=e=>{if(e.target===m)closeModal()};onmount&&onmount(m)}
 function closeModal(){$('#modal').hidden=true;$('#modal').innerHTML=''}
-function addCopy(itemId,holder,choice){const c={cid:uid(),itemId,holder,attuned:false,fails:{}};if(choice)c.choice=choice;S.inv.push(c);save()}
+// A consumable (potion, scroll…) the holder already has: one more in their stack instead of a second copy
+const usedUp=i=>!!(VIEWS&&i&&VIEWS.isConsumable(i));
+function addCopy(itemId,holder,choice,n){
+  const i=byId[itemId],k=JSON.stringify(choice||null);
+  if(usedUp(i)){const same=S.inv.find(c=>c.itemId===itemId&&c.holder===holder&&JSON.stringify(c.choice||null)===k);if(same){same.qty=(Number(same.qty)||1)+(n||1);save();return same}}
+  const c={cid:uid(),itemId,holder,attuned:false,fails:{}};if(choice)c.choice=choice;if(usedUp(i))c.qty=n||1;S.inv.push(c);save();return c}
+function setConsumable(i,v){
+  if(i.id.startsWith('custom:')){const c=S.custom.find(x=>x.id===i.id);if(c)c.consumable=v}
+  else S.edits[i.id]=Object.assign({},S.edits[i.id]||{},{consumable:v});
+  save();buildItems();render()}
 // ---------- items that leave something open (which weapon, which armor, which damage type): asked when handed out ----------
-var VIEWS=null;import('/core/views.js').then(m=>{VIEWS=m}).catch(()=>{});
+var VIEWS=null;import('/core/views.js').then(m=>{VIEWS=m;try{if($('#modal').hidden&&!PLAYER)render()}catch{}}).catch(()=>{});
 const copyName=c=>{const i=byId[c.itemId]||{name:'(missing)'};return VIEWS&&c.choice?VIEWS.choiceName(i.name,c.choice):i.name};
 function chooseFor(i,cur,done){
   const ch=VIEWS?VIEWS.itemChoices(i):null;
@@ -141,7 +150,9 @@ function detail(i){
   ${i.desc?txt(i.desc):'<p class="mu">(no description)</p>'}
   ${needsAtt(i)||i.verdict?`<h3>The Item's Verdict</h3>${verdictHTML(i)}`:''}
   ${fxSection(i)}
-  <h3>Inventory</h3>${copies.length?copies.map(c=>`<div class="copy">${esc(holderName(c.holder))}${c.choice?` · ${esc(copyName(c))}`:''}${c.attuned?' · <span class="att">attuned</span>':''}</div>`).join(''):'<p class="mu">Not in the inventory.</p>'}
+  ${VIEWS?`<h3>Used up when used</h3><label class="row" style="gap:8px;align-items:center"><input type="checkbox" id="consum" ${usedUp(i)?'checked':''} style="width:auto"> Consumable: players have a stack of it and tap Use on their sheet</label><p class="mu" style="font-size:13px">${typeof i.consumable==='boolean'?'You set this.':'Worked out from its name and type (potions, oils, scrolls, elixirs, philters, dusts, ammunition).'}</p>`:''}
+  <h3>Inventory</h3>${copies.length?copies.map(c=>`<div class="copy">${esc(holderName(c.holder))}${usedUp(i)?` · ×${Number(c.qty)||1}`:''}${c.choice?` · ${esc(copyName(c))}`:''}${c.attuned?' · <span class="att">attuned</span>':''}</div>`).join(''):'<p class="mu">Not in the inventory.</p>'}
+  ${(S.useLog||[]).some(u=>u.itemId===i.id)?`<h3>Used</h3>${(S.useLog||[]).filter(u=>u.itemId===i.id).slice(-12).reverse().map(u=>`<div class="copy">${esc(u.who)} used ${esc(u.name)} · <span class="mu">${new Date(u.at).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'})}</span></div>`).join('')}`:''}
   <div class="row"><select id="addto">${holderOpts('stash')}</select><button class="pri" id="addc">Add a copy</button><button id="edit">Edit</button><button id="toplan">+ Planned</button><button id="toq">${S.printQ.includes(i.id)?'✓ In print queue':'+ Print queue'}</button>${i.id.startsWith('custom:')?'<button class="bad" id="del">Delete</button>':S.edits[i.id]?'<button id="revert">Revert to sheet</button>':''}</div></div>`;
 }
 // ---------- effects: what an item does to its holder's numbers on their character sheet ----------
@@ -191,7 +202,7 @@ function partyView(){
     ${p?`<div class="row"><span class="${n>p.limit?'locked':n===p.limit?'att':'mu'}">${n} of ${p.limit} attuned</span><button class="sm" data-lim="${h}:-1">−</button><button class="sm" data-lim="${h}:1">+</button></div>`:''}
     ${cs.map(c=>{const i=byId[c.itemId]||{name:'(missing)'};const f=p?(c.fails[h]||0):0;const locked=f>=3;
       const open=VIEWS&&VIEWS.needsChoice(i);
-      return `<div class="copy"><b><a href="#" data-open="${esc(c.itemId)}" style="color:inherit">${esc(copyName(c))}</a></b> <span class="mu">${esc(i.rarity||'')}</span>${open?` <button class="sm" data-chg="${c.cid}">${c.choice?'Change':'Choose'} ${VIEWS.itemChoices(i).dmg&&!VIEWS.itemChoices(i).options.length?'type':'details'}</button>`:''}<br>
+      return `<div class="copy"><b><a href="#" data-open="${esc(c.itemId)}" style="color:inherit">${esc(copyName(c))}</a></b>${usedUp(i)?` <b>×${Number(c.qty)||1}</b> <button class="sm" data-qty="${c.cid}:-1" aria-label="One fewer">−</button><button class="sm" data-qty="${c.cid}:1" aria-label="One more">+</button>`:''} <span class="mu">${esc(i.rarity||'')}</span>${open?` <button class="sm" data-chg="${c.cid}">${c.choice?'Change':'Choose'} ${VIEWS.itemChoices(i).dmg&&!VIEWS.itemChoices(i).options.length?'type':'details'}</button>`:''}<br>
       ${p&&needsAtt(i)?(c.attuned?'<span class="att">Attuned</span>':locked?'<span class="locked">Locked out</span>':'<span class="mu">Not attuned</span>')+` <span title="failed attempts">${[0,1,2].map(k=>`<span class="pip ${k<f?'f':''}"></span>`).join('')}</span>`:''}
       <div class="row" style="margin-top:4px">${p&&needsAtt(i)&&!c.attuned&&!locked?`<button class="sm pri" data-att="${c.cid}">Attune…</button>`:''}${c.attuned?`<button class="sm" data-un="${c.cid}">Un-attune</button>`:''}
       <select class="sm" data-mv="${c.cid}" style="padding:3px"><option value="">Move to…</option>${h!=='stash'?'<option value="stash">Party Stash</option>':''}${S.pcs.filter(x=>x.id!==h).map(x=>`<option value="${x.id}">${esc(x.name)}</option>`)}</select>
@@ -296,7 +307,7 @@ function editForm(i){
       if(k==='none')o.verdict=null;
       else{const vv={kind:k};if(k==='flavor')vv.flavor=g('flavor');else{vv.dc=+g('dc')||g('dc');['trait','prompt','success','fail1','fail2','fail3'].forEach(x=>vv[x]=g(x))}
         const gm=g('gm');if(gm)vv.gm=gm.split(/\n\n+/);o.verdict=vv}
-      if(isNew){S.custom.push(Object.assign({},it,o));S.ui.sel=it.id}else if(it.id.startsWith('custom:')){Object.assign(S.custom.find(c=>c.id===it.id),o)}else S.edits[it.id]=Object.assign(S.edits[it.id]&&S.edits[it.id].fx?{fx:S.edits[it.id].fx}:{},o);
+      if(isNew){S.custom.push(Object.assign({},it,o));S.ui.sel=it.id}else if(it.id.startsWith('custom:')){Object.assign(S.custom.find(c=>c.id===it.id),o)}else S.edits[it.id]=Object.assign(S.edits[it.id]&&S.edits[it.id].fx?{fx:S.edits[it.id].fx}:{},S.edits[it.id]&&typeof S.edits[it.id].consumable==='boolean'?{consumable:S.edits[it.id].consumable}:{},o);
       save();buildItems();closeModal();render()};
   });
 }
@@ -392,6 +403,27 @@ async function publishItems(){
     const k=JSON.stringify(v);if(sentMi.get(p.id)===k)continue;
     if(await L.channel(keys.get(p.charId),'mi',{magicItems:v.items,attuneMax:v.limit}))sentMi.set(p.id,k);
   }
+  watchUses(L,keys);
+}
+// ---------- a player tapped Use on a consumable (a potion, a scroll): one fewer in their stack, and it goes in the
+// item's history. Sent under that character's own key (c/<key>/used); counted once, then cleared. ----------
+var usedW=new Map();
+function watchUses(L,keys){
+  if(typeof L.cwatchEach!=='function')return;
+  for(const[charId,key]of keys){
+    if(usedW.has(key))continue;
+    usedW.set(key,L.cwatchEach(key,'used',(id,u)=>{if(u)takeUse(L,key,charId,id,u)}));
+  }
+}
+function takeUse(L,key,charId,id,u){
+  const p=S.pcs.find(x=>x.charId===charId),c=S.inv.find(x=>x.cid===u.cid);
+  if(p&&c&&c.holder===p.id&&!(c.usedIds||[]).includes(id)){
+    const left=(Number(c.qty)||1)-1;
+    S.useLog=[...(S.useLog||[]),{itemId:c.itemId,name:copyName(c),who:p.name,at:Number(u.t)||Date.now()}].slice(-300);
+    if(left<=0)S.inv=S.inv.filter(x=>x!==c);else{c.qty=left;c.usedIds=[...(c.usedIds||[]),id].slice(-30)}
+    save();try{if($('#modal').hidden)render()}catch{}
+  }
+  L.cput(key,`used/${id}`,null);
 }
 // ---------- what players can browse: the whole library except what the DM hides (never prices, Verdicts,
 // GM notes or GM-only entries). The DM's device keeps the table's copy on the live link up to date. ----------
@@ -603,6 +635,7 @@ function bind(){
       $('#toq').onclick=()=>{const q=S.printQ,k=q.indexOf(sel.id);k<0?q.push(sel.id):q.splice(k,1);save();render()};
       const d=$('#del');if(d)d.onclick=()=>{if(confirm('Delete this custom item and its copies?')){S.custom=S.custom.filter(c=>c.id!==sel.id);S.inv=S.inv.filter(c=>c.itemId!==sel.id);S.printQ=S.printQ.filter(x=>x!==sel.id);delete S.hidden[sel.id];S.ui.sel=null;save();buildItems();render()}};
       const r=$('#revert');if(r)r.onclick=()=>{delete S.edits[sel.id];save();buildItems();render()};
+      const cs=$('#consum');if(cs)cs.onchange=()=>setConsumable(sel,cs.checked);
       const hv=$('#vis');if(hv)hv.onclick=()=>{if(S.hidden[sel.id])delete S.hidden[sel.id];else S.hidden[sel.id]=true;save();render()};
     }
   }
@@ -611,6 +644,7 @@ function bind(){
     on('[data-att]','click',e=>startAttune(e.currentTarget.dataset.att));
     on('[data-un]','click',e=>{S.inv.find(c=>c.cid===e.currentTarget.dataset.un).attuned=false;save();render()});
     on('[data-mv]','change',e=>{const c=S.inv.find(c=>c.cid===e.currentTarget.dataset.mv),to=e.target.value;if(!to)return;c.holder=to;c.attuned=false;save();render()});
+    on('[data-qty]','click',e=>{const[cid,d]=e.currentTarget.dataset.qty.split(':');const c=S.inv.find(x=>x.cid===cid);if(!c)return;const q=(Number(c.qty)||1)+ +d;if(q<1){if(!confirm('That was the last one. Remove it?'))return;S.inv=S.inv.filter(x=>x!==c)}else c.qty=q;save();render()});
     on('[data-rm]','click',e=>{if(confirm('Remove this copy (its fail counts are lost)?')){S.inv=S.inv.filter(c=>c.cid!==e.currentTarget.dataset.rm);save();render()}});
     on('[data-chg]','click',e=>{const c=S.inv.find(x=>x.cid===e.currentTarget.dataset.chg);if(!c)return;chooseFor(byId[c.itemId],c.choice,ch=>{if(ch){c.choice=ch;save();render()}})});
     on('[data-pq]','click',e=>{const id=e.currentTarget.dataset.pq;if(!S.printQ.includes(id))S.printQ.push(id);save();e.currentTarget.textContent='✓ queued'});
