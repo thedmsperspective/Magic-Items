@@ -8,6 +8,8 @@ const MINPT=10, MAXPT=16;
 let S;
 function defaults(){return{pcs:[1,2,3,4,5,6].map(n=>({id:'pc'+n,name:'Player '+n,limit:3})),inv:[],custom:[],edits:{},hidden:{},printQ:[],print:{pt:11,paper:'letter',showAtt:true},ui:{q:'',src:'',rar:'',att:'',vis:'',sel:null,tab:'items',showGM:true}}}
 function load(){try{const r=localStorage.getItem(KEY);if(r){const o=JSON.parse(r);return Object.assign(defaults(),o,{hidden:o.hidden||{},ui:Object.assign(defaults().ui,o.ui||{})})}}catch(e){}return defaults()}
+// a short note at the bottom of the screen
+function toast(m){let t=document.getElementById('miToast');if(!t){t=document.createElement('div');t.id='miToast';t.setAttribute('role','status');t.style.cssText='position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:999;max-width:calc(100vw - 32px);background:#2a241d;color:#f3ece0;padding:10px 16px;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.3);font:14px/1.35 system-ui,sans-serif';document.body.append(t)}t.textContent=m;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>{t.hidden=true},4000)}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){alert('Could not save to browser storage: '+e)}if(typeof syncNote==='function')syncNote();if(typeof publishSoon==='function')publishSoon()}
 S=load();
 // ---------- the item library ----------
@@ -56,6 +58,35 @@ function addCopy(itemId,holder,choice,n){
   const i=byId[itemId],k=JSON.stringify(choice||null);
   if(usedUp(i)){const same=S.inv.find(c=>c.itemId===itemId&&c.holder===holder&&JSON.stringify(c.choice||null)===k);if(same){same.qty=(Number(same.qty)||1)+(n||1);save();return same}}
   const c={cid:uid(),itemId,holder,attuned:false,fails:{}};if(choice)c.choice=choice;if(usedUp(i))c.qty=n||1;S.inv.push(c);save();return c}
+// ---------- Containers and charges: what the sheets do with this item (read from its name and description; you can change it)
+function gearSettings(i){
+  const ct=VIEWS.containerOf(i),ch=VIEWS.chargesOf(i),mine=x=>typeof x==='object'&&x!==null;
+  const rec=['Dawn','Long rest','Short rest','None'];
+  return `<h3>Container</h3><div class="gearset">
+    <label class="row" style="gap:8px;align-items:center"><input type="checkbox" id="ctOn" ${ct?'checked':''} style="width:auto"> This is a container: players can move things into it on their sheet</label>
+    <div class="row" style="gap:10px;flex-wrap:wrap;align-items:center"><label>Holds <input id="ctCap" type="number" min="0" step="1" value="${ct&&ct.cap?ct.cap:''}" placeholder="no limit" style="width:96px"> lb</label>
+      <label class="row" style="gap:6px;align-items:center"><input type="checkbox" id="ctCounts" ${ct&&ct.counts?'checked':''} style="width:auto"> What's inside counts toward carried weight</label>
+      <label class="row" style="gap:6px;align-items:center"><input type="checkbox" id="ctRift" ${ct&&ct.rift?'checked':''} style="width:auto"> Astral rift with a Bag of Holding</label></div>
+    ${ct&&ct.pouches?`<p class="mu" style="font-size:13px">Compartments: ${ct.pouches.map(p=>`${esc(p.name)} (${p.cap?p.cap+' lb':p.count+' items'})`).join(', ')}</p>`:''}
+    <p class="mu" style="font-size:13px">${mine(i.container)?'You set this.':ct?'Set up from the book.':'Not a container.'}</p></div>
+  <h3>Charges</h3><div class="gearset"><div class="row" style="gap:10px;flex-wrap:wrap;align-items:center">
+    <label>Charges <input id="chMax" type="number" min="0" step="1" value="${ch?ch.max:''}" placeholder="none" style="width:80px"></label>
+    <label>Come back <select id="chRec" style="width:auto">${rec.map(r=>`<option ${ch&&ch.rec===r?'selected':''}>${r}</option>`).join('')}</select></label>
+    <label>How many <input id="chRegain" value="${esc(ch?ch.regain:'')}" placeholder="1d6 + 1, or all" style="width:110px"></label></div>
+    <label style="display:block;margin-top:6px">When the last charge is used <input id="chLast" value="${esc(ch?ch.last:'')}" placeholder="Roll a d20. On a 1, it crumbles to ashes." style="width:100%"></label>
+    <p class="mu" style="font-size:13px">${mine(i.charges)?'You set this.':ch?'Read from the description. Once-a-day items count as 1 charge.':'No charges.'} Players see it in their Limited features.</p>
+    <div class="row" style="gap:8px"><button class="sm pri" id="gearSave">Save container and charges</button>${mine(i.container)||mine(i.charges)?'<button class="sm" id="gearReset">Use what the item says</button>':''}</div></div>`;
+}
+function saveGear(i,reset){
+  const put=(k,v)=>{if(i.id.startsWith('custom:')){const c=S.custom.find(x=>x.id===i.id);if(c){if(v===undefined)delete c[k];else c[k]=v}}else{const e=Object.assign({},S.edits[i.id]||{});if(v===undefined)delete e[k];else e[k]=v;if(Object.keys(e).length)S.edits[i.id]=e;else delete S.edits[i.id]}};
+  if(reset){put('container',undefined);put('charges',undefined)}
+  else{
+    const on=$('#ctOn').checked,book=VIEWS.containerOf({name:i.name});
+    put('container',on?{on:true,cap:Math.max(0,Number($('#ctCap').value)||0),counts:$('#ctCounts').checked,rift:$('#ctRift').checked,...(book&&book.pouches?{pouches:book.pouches}:{})}:{on:false});
+    put('charges',{max:Math.max(0,Math.floor(Number($('#chMax').value)||0)),rec:$('#chRec').value,regain:$('#chRegain').value.trim()||'all',last:$('#chLast').value.trim()});
+  }
+  save();buildItems();render();toast(reset?'Back to what the item says.':'Saved. Players\' sheets pick it up when they sync.');
+}
 function setConsumable(i,v){
   if(i.id.startsWith('custom:')){const c=S.custom.find(x=>x.id===i.id);if(c)c.consumable=v}
   else S.edits[i.id]=Object.assign({},S.edits[i.id]||{},{consumable:v});
@@ -151,8 +182,9 @@ function detail(i){
   ${needsAtt(i)||i.verdict?`<h3>The Item's Verdict</h3>${verdictHTML(i)}`:''}
   ${fxSection(i)}
   ${VIEWS?`<h3>Used up when used</h3><label class="row" style="gap:8px;align-items:center"><input type="checkbox" id="consum" ${usedUp(i)?'checked':''} style="width:auto"> Consumable: players have a stack of it and tap Use on their sheet</label><p class="mu" style="font-size:13px">${typeof i.consumable==='boolean'?'You set this.':'Worked out from its name and type (potions, oils, scrolls, elixirs, philters, dusts, ammunition).'}</p>`:''}
+  ${VIEWS?gearSettings(i):''}
   <h3>Inventory</h3>${copies.length?copies.map(c=>`<div class="copy">${esc(holderName(c.holder))}${usedUp(i)?` · ×${Number(c.qty)||1}`:''}${c.choice?` · ${esc(copyName(c))}`:''}${c.attuned?' · <span class="att">attuned</span>':''}</div>`).join(''):'<p class="mu">Not in the inventory.</p>'}
-  ${(S.useLog||[]).some(u=>u.itemId===i.id)?`<h3>Used</h3>${(S.useLog||[]).filter(u=>u.itemId===i.id).slice(-12).reverse().map(u=>`<div class="copy">${esc(u.who)} used ${esc(u.name)} · <span class="mu">${new Date(u.at).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'})}</span></div>`).join('')}`:''}
+  ${(S.useLog||[]).some(u=>u.itemId===i.id)?`<h3>History</h3>${(S.useLog||[]).filter(u=>u.itemId===i.id).slice(-12).reverse().map(u=>`<div class="copy">${esc(u.who)} ${u.why?'lost':'used'} ${esc(u.name)}${u.why?` (${esc(u.why)})`:''} · <span class="mu">${new Date(u.at).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'})}</span></div>`).join('')}`:''}
   <div class="row"><select id="addto">${holderOpts('stash')}</select><button class="pri" id="addc">Add a copy</button><button id="edit">Edit</button><button id="toplan">+ Planned</button><button id="toq">${S.printQ.includes(i.id)?'✓ In print queue':'+ Print queue'}</button>${i.id.startsWith('custom:')?'<button class="bad" id="del">Delete</button>':S.edits[i.id]?'<button id="revert">Revert to sheet</button>':''}</div></div>`;
 }
 // ---------- effects: what an item does to its holder's numbers on their character sheet ----------
@@ -307,7 +339,7 @@ function editForm(i){
       if(k==='none')o.verdict=null;
       else{const vv={kind:k};if(k==='flavor')vv.flavor=g('flavor');else{vv.dc=+g('dc')||g('dc');['trait','prompt','success','fail1','fail2','fail3'].forEach(x=>vv[x]=g(x))}
         const gm=g('gm');if(gm)vv.gm=gm.split(/\n\n+/);o.verdict=vv}
-      if(isNew){S.custom.push(Object.assign({},it,o));S.ui.sel=it.id}else if(it.id.startsWith('custom:')){Object.assign(S.custom.find(c=>c.id===it.id),o)}else S.edits[it.id]=Object.assign(S.edits[it.id]&&S.edits[it.id].fx?{fx:S.edits[it.id].fx}:{},S.edits[it.id]&&typeof S.edits[it.id].consumable==='boolean'?{consumable:S.edits[it.id].consumable}:{},o);
+      if(isNew){S.custom.push(Object.assign({},it,o));S.ui.sel=it.id}else if(it.id.startsWith('custom:')){Object.assign(S.custom.find(c=>c.id===it.id),o)}else S.edits[it.id]=Object.assign(S.edits[it.id]&&S.edits[it.id].fx?{fx:S.edits[it.id].fx}:{},S.edits[it.id]&&typeof S.edits[it.id].consumable==='boolean'?{consumable:S.edits[it.id].consumable}:{},S.edits[it.id]&&S.edits[it.id].container?{container:S.edits[it.id].container}:{},S.edits[it.id]&&S.edits[it.id].charges?{charges:S.edits[it.id].charges}:{},o);
       save();buildItems();closeModal();render()};
   });
 }
@@ -413,7 +445,15 @@ function watchUses(L,keys){
   for(const[charId,key]of keys){
     if(usedW.has(key))continue;
     usedW.set(key,L.cwatchEach(key,'used',(id,u)=>{if(u)takeUse(L,key,charId,id,u)}));
+    // you approved it in your request box: a magic item destroyed (an Astral rift, a wand's last charge)
+    L.cwatchEach(key,'gone',(id,g)=>{if(g)takeGone(L,key,id,g)});
   }
+}
+function takeGone(L,key,id,g){
+  const cids=Array.isArray(g.cids)?g.cids.map(String):[],gone=S.inv.filter(c=>cids.includes(c.cid));
+  for(const c of gone)S.useLog=[...(S.useLog||[]),{itemId:c.itemId,name:copyName(c),who:holderName(c.holder),at:Number(g.t)||Date.now(),why:String(g.why||'destroyed').slice(0,120)}].slice(-300);
+  if(gone.length){S.inv=S.inv.filter(c=>!cids.includes(c.cid));save();try{if($('#modal').hidden)render()}catch{}toast(`${gone.map(c=>copyName(c)).join(' and ')} destroyed.`)}
+  L.cput(key,`gone/${id}`,null);
 }
 function takeUse(L,key,charId,id,u){
   const p=S.pcs.find(x=>x.charId===charId),c=S.inv.find(x=>x.cid===u.cid);
@@ -636,6 +676,7 @@ function bind(){
       const d=$('#del');if(d)d.onclick=()=>{if(confirm('Delete this custom item and its copies?')){S.custom=S.custom.filter(c=>c.id!==sel.id);S.inv=S.inv.filter(c=>c.itemId!==sel.id);S.printQ=S.printQ.filter(x=>x!==sel.id);delete S.hidden[sel.id];S.ui.sel=null;save();buildItems();render()}};
       const r=$('#revert');if(r)r.onclick=()=>{delete S.edits[sel.id];save();buildItems();render()};
       const cs=$('#consum');if(cs)cs.onchange=()=>setConsumable(sel,cs.checked);
+      const gs=$('#gearSave');if(gs)gs.onclick=()=>saveGear(sel,false);const gr=$('#gearReset');if(gr)gr.onclick=()=>saveGear(sel,true);
       const hv=$('#vis');if(hv)hv.onclick=()=>{if(S.hidden[sel.id])delete S.hidden[sel.id];else S.hidden[sel.id]=true;save();render()};
     }
   }
